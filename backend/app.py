@@ -25,7 +25,7 @@ PROJECT_TTL = int(os.getenv("RAFA_PROJECT_TTL_SECONDS", str(6 * 60 * 60)))
 API_TOKEN = os.getenv("RAFA_API_TOKEN", "")
 CORS_ORIGINS = [x.strip() for x in os.getenv("RAFA_CORS_ORIGINS", "*").split(",") if x.strip()]
 
-app = FastAPI(title="Rafa Studio Render API", version="0.1.0")
+app = FastAPI(title="Rafa Studio Render API", version="0.1.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS if CORS_ORIGINS != ["*"] else ["*"],
