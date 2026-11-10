@@ -36,14 +36,8 @@ button,input,textarea{font:inherit}button{cursor:pointer}.shell{max-width:1440px
 <div class="renderpanel">
   <div class="eyebrow">04 / Montage intelligent</div>
   <h3>Créer le Reel Rafa</h3>
-  <p>Un seul clic pour téléverser le lot par blocs reprenables, analyser les images et produire un premier montage vertical de 20 à 30 secondes.</p>
-  <p class="notice">Le moteur analyse les images, classe les moments de cuisine et d’expérience lorsque la vision IA est activée, puis vérifie la chronologie et prépare un Reel vertical.</p>
-  <div class="access" id="accessPanel" hidden>
-    <label for="accessPassword">Accès privé Rafa Studio</label>
-    <input id="accessPassword" type="password" autocomplete="current-password" placeholder="Mot de passe du studio">
-    <button class="btn" id="unlock">Déverrouiller</button>
-    <div id="accessMessage" class="small" aria-live="polite"></div>
-  </div>
+  <p>Un seul clic pour analyser et assembler tes vidéos directement sur ton iPhone, sans téléversement vers un serveur.</p>
+  <p class="notice">Le moteur local évalue la qualité visuelle des passages, sélectionne des moments distincts et prépare un Reel vertical. Les vidéos restent dans ton navigateur.</p>
   <button class="btn" id="generate">Générer la vidéo</button>
   <div id="renderPanel" hidden>
     <progress id="renderProgress" max="100" value="0"></progress>
@@ -268,6 +262,5 @@ window.addEventListener('beforeunload',()=>{
  clips.forEach(clip=>URL.revokeObjectURL(clip.url));
 });
 </script>
-<script src="./config.js"></script>
 <script src="./engine-client.js"></script>
 </body></html>
