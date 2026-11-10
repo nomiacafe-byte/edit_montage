@@ -72,7 +72,9 @@
       }
       if (job.audit) {
         const mode = job.audit.mode === "capture-timestamps" ? "Horodatages des fichiers" : "Estimation visuelle de la lumière";
-        audit.textContent = "Chronologie : " + mode + " · confiance " + job.audit.chronology_confidence + ". " + job.audit.note;
+        const vision = job.audit.semantic_analysis === "vision-enabled" ? "Analyse visuelle IA activée" : "Analyse visuelle locale";
+        const categories = Array.isArray(job.audit.shot_categories) ? " · Plans : " + job.audit.shot_categories.join(", ") : "";
+        audit.textContent = vision + " · Chronologie : " + mode + " · confiance " + job.audit.chronology_confidence + categories + ". " + job.audit.note;
       }
       if (job.status === "preview_ready") return job;
       if (job.status === "error") throw new Error(job.error || job.message || "Le rendu a échoué.");
