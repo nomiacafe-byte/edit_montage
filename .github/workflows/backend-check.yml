@@ -21,6 +21,10 @@ jobs:
         run: python -m compileall -q backend
       - name: Build render container
         run: docker build -t rafa-studio-api ./backend
+      - name: End-to-end render smoke test
+        run: |
+          python -m pip install requests
+          python backend/smoke_test.py
 
 # Build and syntax checks run against the current backend source.
 
