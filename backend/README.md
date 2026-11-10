@@ -5,7 +5,7 @@ This service is the first real server-side editing engine. It accepts resumable 
 ## Deploy
 
 1. In Render, choose **New → Blueprint** and connect this repository.
-2. Render reads the root `render.yaml` and creates `rafa-studio-api`.
+2. Render reads the root `render.yaml` and creates `rafa-studio-api`. During setup, provide a private `RAFA_ACCESS_PASSWORD`; Render generates `RAFA_SESSION_SECRET` automatically. The web app asks for this password and receives a 12-hour signed session. Do not publish the password or put it in `config.js`.
 3. After deployment, the API base URL is normally `https://rafa-studio-api.onrender.com`.
 4. Set that URL as `window.RAFA_API_BASE` in the front-end `config.js` file and redeploy GitHub Pages.
 
@@ -14,6 +14,7 @@ The service needs a paid CPU instance for dependable video processing. Its worki
 ## API
 
 - `GET /health`
+- `POST /api/auth/login` — exchange the private studio password for a short-lived session token
 - `POST /api/projects` — create a project
 - `PUT /api/projects/{id}/files/{f0000}/chunks/{index}` — upload an 8 MB chunk as multipart field `file`
 - `POST /api/projects/{id}/complete` — join chunks and queue the edit
@@ -22,7 +23,7 @@ The service needs a paid CPU instance for dependable video processing. Its worki
 - `GET /api/projects/{id}/download` — final MP4 transfer\n- `POST /api/projects/{id}/ack-download` — confirm complete transfer and delete all source/intermediate files
 - `DELETE /api/projects/{id}` — cancel and delete a project
 
-Optional `X-Rafa-Token` authentication is supported through `RAFA_API_TOKEN`. Do not place a long-lived secret in a public static front end. Before public launch, put the API behind an authenticated upload gateway/rate limiter and add durable job storage/queueing.
+The upload and render endpoints require the short-lived `X-Rafa-Token` session. Configure `RAFA_ACCESS_PASSWORD` and `RAFA_SESSION_SECRET` on the backend; the frontend stores only the expiring session token in tab session storage. A separate `RAFA_API_TOKEN` can be used for private server-to-server access. Creation is also rate-limited by IP.
 
 ## Current editorial-engine scope
 
