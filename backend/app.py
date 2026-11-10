@@ -151,6 +151,84 @@ def frame_metrics(path: Path, duration: float) -> list[dict[str, float]]:
     return samples
 
 
+def vision_describe_candidates(candidates: list[dict[str, Any]]) -> bool:
+    """Optional semantic shot understanding. Sends sampled still frames, never source video files."""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return False
+    model = os.getenv("RAFA_VISION_MODEL", "gpt-5.5")
+    ranked = sorted(candidates, key=lambda c: c["visual_score"], reverse=True)[:40]
+    for offset in range(0, len(ranked), 8):
+        batch = ranked[offset:offset + 8]
+        content: list[dict[str, Any]] = [{
+            "type": "input_text",
+            "text": (
+                "You classify sampled still frames for Rafa Pizza, a premium mobile pizza catering brand. "
+                "Return only JSON with an items array. Each item must include index, category, quality, action, light, notes. "
+                "category must be one of dough, topping, guests, oven, finished_pizza, other. "
+                "quality is an integer 1-5 for clarity, composition and usefulness. "
+                "light is day, dusk, night, indoor or unknown. Describe only what is visible; never infer an unseen action. "
+                "Use guests only when people are clearly visible and finished_pizza only for a complete appetizing pizza."
+            )
+        }]
+        for local_index, candidate in enumerate(batch):
+            cap = cv2.VideoCapture(candidate["path"])
+            cap.set(cv2.CAP_PROP_POS_MSEC, float(candidate["moment_time"]) * 1000)
+            ok, frame = cap.read()
+            cap.release()
+            if not ok or frame is None:
+                continue
+            h, w = frame.shape[:2]
+            scale = min(1.0, 640 / max(w, h))
+            if scale < 1.0:
+                frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 72])
+            if not ok:
+                continue
+            data_url = "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
+            content.append({"type": "input_text", "text": "Frame index " + str(local_index) + "."})
+            content.append({"type": "input_image", "image_url": data_url, "detail": "low"})
+        if len(content) == 1:
+            continue
+        payload = json.dumps({
+            "model": model,
+            "store": False,
+            "max_output_tokens": 1800,
+            "input": [{"role": "user", "content": content}],
+        }).encode("utf-8")
+        request = urllib.request.Request(
+            "https://api.openai.com/v1/responses",
+            data=payload,
+            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                body = json.loads(response.read().decode("utf-8"))
+            output_text = "\n".join(
+                part.get("text", "")
+                for item in body.get("output", []) if item.get("type") == "message"
+                for part in item.get("content", []) if part.get("type") == "output_text"
+            )
+            parsed = json.loads(output_text)
+            for result in parsed.get("items", []):
+                index = int(result.get("index", -1))
+                if index < 0 or index >= len(batch):
+                    continue
+                candidate = batch[index]
+                category = str(result.get("category", "other"))
+                if category not in {"dough", "topping", "guests", "oven", "finished_pizza", "other"}:
+                    category = "other"
+                candidate["semantic_category"] = category
+                candidate["semantic_quality"] = max(1, min(5, int(result.get("quality", 3))))
+                candidate["semantic_action"] = str(result.get("action", ""))[:180]
+                candidate["semantic_light"] = str(result.get("light", "unknown"))
+                candidate["semantic_notes"] = str(result.get("notes", ""))[:180]
+        except Exception:
+            return False
+    return any("semantic_category" in candidate for candidate in ranked)
+
+
 def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     for source_index, item in enumerate(files):
@@ -189,8 +267,10 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
     if not candidates:
         raise RuntimeError("Aucun passage vidéo exploitable n'a été détecté.")
 
+    semantic_enabled = vision_describe_candidates(candidates)
+
     # Rank by visual quality, but cap each source at seven shots so one long recording can fill a 20–30 s Reel without letting a single angle dominate.
-    selected_pool = sorted(candidates, key=lambda c: c["visual_score"], reverse=True)
+    selected_pool = sorted(candidates, key=lambda c: c["visual_score"] + (0.08 * c.get("semantic_quality", 3) if semantic_enabled else 0.0), reverse=True)
     chosen: list[dict[str, Any]] = []
     source_counts: dict[int, int] = {}
     elapsed = 0.0
@@ -227,6 +307,8 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         "mode": chronology_mode,
         "selected_count": len(chosen),
         "source_count": len({c["source_index"] for c in chosen}),
+        "semantic_analysis": "vision-enabled" if semantic_enabled else "visual-fallback",
+        "shot_categories": [c.get("semantic_category", "unclassified") for c in chosen],
         "estimated_seconds": round(sum(c["clip_duration"] for c in chosen), 2),
         "chronology_confidence": "medium" if chronology_mode == "capture-timestamps" else "low",
         "note": "Plusieurs moments distincts sont évalués par vidéo, avec au plus sept extraits par source pour gérer aussi un seul long enregistrement. L'ordre par luminosité est une estimation, pas une preuve de chronologie; les événements distincts devront être regroupés par analyse sémantique.",
