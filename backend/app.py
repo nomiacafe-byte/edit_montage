@@ -12,7 +12,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 jobs: dict[str, dict[str, Any]] = {}
-project_locks: dict[str, asyncio.Lock] = {}
+project_locks: dict[str, asyncio.Lock] = {}\ncreation_events: dict[str, list[float]] = {}
 
 
 def guard(token: str | None) -> None:
@@ -70,7 +70,7 @@ def load_state(project_id: str) -> dict[str, Any]:
     return state
 
 
-def run_cmd(args: list[str], timeout: int = 3600) -> str:
+def enforce_creation_limit(ip: str) -> None:\n    now = time.time()\n    events = [t for t in creation_events.get(ip, []) if now - t < 3600]\n    active = sum(1 for state in jobs.values() if state.get("owner_ip") == ip and state.get("status") not in ("error", "downloading"))\n    if len(events) >= 5 or active >= 2:\n        raise HTTPException(status_code=429, detail="Trop de projets actifs. Réessaie plus tard.")\n    events.append(now)\n    creation_events[ip] = events\n\n\ndef run_cmd(args: list[str], timeout: int = 3600) -> str:
     proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
     if proc.returncode:
         raise RuntimeError((proc.stderr or proc.stdout)[-5000:])
@@ -286,7 +286,7 @@ def create_project(payload: ProjectCreate, x_rafa_token: str | None = Header(def
     now = time.time()
     state = {"project_id": project_id, "status": "uploading", "progress": 0,
              "message": "Projet créé. Téléverse les vidéos.", "created_at": now,
-             "updated_at": now, "filenames": payload.filenames}
+             "updated_at": now, "filenames": payload.filenames, "owner_ip": client_ip}
     jobs[project_id] = state
     save_state(project_id)
     return {"project_id": project_id, "chunk_size_hint": 8 * 1024 * 1024}
@@ -297,7 +297,7 @@ async def upload_chunk(project_id: str, file_id: str, chunk_index: int, file: Up
                        x_rafa_token: str | None = Header(default=None)):
     guard(x_rafa_token)
     folder = project_dir(project_id)
-    if not file_id.isalnum() or chunk_index < 0:
+    if not file_id.startswith("f") or not file_id[1:].isdigit() or len(file_id) != 5 or chunk_index < 0 or chunk_index >= 128:
         raise HTTPException(status_code=400, detail="Invalid file or chunk id")
     data = await file.read(8 * 1024 * 1024 + 1)
     if len(data) > 8 * 1024 * 1024:
