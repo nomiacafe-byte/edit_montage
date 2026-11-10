@@ -13,6 +13,7 @@
   let activeProject = null;
   let previewUrl = null;
   let busy = false;
+  let engineReady = false;
 
   const headers = (extra = {}) => token ? { ...extra, "X-Rafa-Token": token } : extra;
   const setProgress = (value, label) => {
@@ -148,7 +149,7 @@
       activeProject = null;
     } finally {
       busy = false;
-      button.disabled = false;
+      button.disabled = !engineReady;
     }
   }
 
@@ -178,11 +179,37 @@
     }
   }
 
+  async function checkEngine() {
+    if (!apiBase) {
+      panel.hidden = false;
+      button.disabled = true;
+      message.textContent = "Le moteur serveur doit être déployé et configuré avant de générer un Reel.";
+      return;
+    }
+    button.disabled = true;
+    try {
+      const response = await fetch(apiBase + "/health");
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const data = await response.json();
+      engineReady = Boolean(data.ok);
+      button.disabled = !engineReady;
+      if (!engineReady) throw new Error("Service non prêt");
+      message.textContent = "Moteur de rendu connecté. Tes vidéos peuvent être traitées.";
+      panel.hidden = true;
+    } catch (_) {
+      engineReady = false;
+      button.disabled = true;
+      panel.hidden = false;
+      message.textContent = "Le moteur de rendu n'est pas encore joignable. Le service backend doit être déployé sur Render avant de lancer un montage.";
+    }
+  }
+
   button.addEventListener("click", generate);
   download.addEventListener("click", downloadFinal);
   if (!apiBase) {
     button.title = "Le moteur serveur doit être déployé avant la génération.";
   }
+  checkEngine();
   window.addEventListener("beforeunload", () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   });
