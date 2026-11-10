@@ -18,3 +18,7 @@ services:
         value: gpt-5.5
       - key: OPENAI_API_KEY
         sync: false
+      - key: RAFA_ACCESS_PASSWORD
+        sync: false
+      - key: RAFA_SESSION_SECRET
+        generateValue: true
