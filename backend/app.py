@@ -299,25 +299,48 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
     semantic_enabled = vision_describe_candidates(candidates)
 
     # Rank by visual quality, but cap each source at seven shots so one long recording can fill a 20–30 s Reel without letting a single angle dominate.
-    selected_pool = sorted(candidates, key=lambda c: c["visual_score"] + (0.08 * c.get("semantic_quality", 3) if semantic_enabled else 0.0), reverse=True)
+    def editorial_score(candidate: dict[str, Any]) -> float:
+        score = candidate["visual_score"]
+        if semantic_enabled:
+            score += 0.06 * candidate.get("semantic_quality", 3)
+            if candidate.get("semantic_category") in {"dough", "topping", "guests", "oven", "finished_pizza"}:
+                score += 0.12
+        return score
+
+    selected_pool = sorted(candidates, key=editorial_score, reverse=True)
     chosen: list[dict[str, Any]] = []
     source_counts: dict[int, int] = {}
     elapsed = 0.0
-    for candidate in selected_pool:
+
+    def add_candidate(candidate: dict[str, Any]) -> None:
+        nonlocal elapsed
         source_id = int(candidate["source_index"])
-        if source_counts.get(source_id, 0) >= 7:
-            continue
-        if elapsed >= target_seconds:
-            break
+        if source_counts.get(source_id, 0) >= 7 or elapsed >= target_seconds:
+            return
         remaining = target_seconds - elapsed
         if remaining < 1.5:
-            break
-        candidate = dict(candidate)
-        candidate["clip_duration"] = min(candidate["clip_duration"], remaining)
-        candidate["end"] = candidate["start"] + candidate["clip_duration"]
-        chosen.append(candidate)
+            return
+        shot = dict(candidate)
+        shot["clip_duration"] = min(shot["clip_duration"], remaining)
+        shot["end"] = shot["start"] + shot["clip_duration"]
+        chosen.append(shot)
         source_counts[source_id] = source_counts.get(source_id, 0) + 1
-        elapsed += candidate["clip_duration"]
+        elapsed += shot["clip_duration"]
+
+    # If semantic vision is enabled, reserve one strongest shot for each available
+    # Rafa story role before filling the remaining runtime with the best alternatives.
+    if semantic_enabled:
+        for category in ("dough", "topping", "guests", "oven", "finished_pizza"):
+            role_candidates = [c for c in selected_pool if c.get("semantic_category") == category]
+            if role_candidates:
+                add_candidate(role_candidates[0])
+
+    for candidate in selected_pool:
+        if elapsed >= target_seconds or target_seconds - elapsed < 1.5:
+            break
+        if any(candidate["source_index"] == shot["source_index"] and abs(candidate["start"] - shot["start"]) < 0.25 for shot in chosen):
+            continue
+        add_candidate(candidate)
 
     if not chosen:
         chosen = [max(candidates, key=lambda c: c["visual_score"])]
