@@ -12,7 +12,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -392,22 +392,28 @@ def preview(project_id: str, x_rafa_token: str | None = Header(default=None)):
 
 
 @app.get("/api/projects/{project_id}/download")
-def download(project_id: str, background: BackgroundTasks, x_rafa_token: str | None = Header(default=None)):
+def download(project_id: str, x_rafa_token: str | None = Header(default=None)):
     guard(x_rafa_token)
     state = load_state(project_id)
     path = state.get("output_path")
-    if state.get("status") != "preview_ready" or not path or not Path(path).exists():
+    if state.get("status") not in ("preview_ready", "downloading", "download_ready") or not path or not Path(path).exists():
         raise HTTPException(status_code=409, detail="Final MP4 is not ready")
-    state.update(status="downloading", message="Téléchargement du MP4 en cours.")
+    state.update(status="download_ready", message="MP4 transmis. Confirmation de livraison en attente.")
     save_state(project_id)
+    return FileResponse(path, media_type="video/mp4", filename="Rafa-Pizza-Reel.mp4")
 
-    def cleanup() -> None:
-        shutil.rmtree(ROOT / project_id, ignore_errors=True)
-        jobs.pop(project_id, None)
-        project_locks.pop(project_id, None)
 
-    background.add_task(cleanup)
-    return FileResponse(path, media_type="video/mp4", filename="Rafa-Pizza-Reel.mp4", background=background)
+@app.post("/api/projects/{project_id}/ack-download")
+def acknowledge_download(project_id: str, x_rafa_token: str | None = Header(default=None)):
+    guard(x_rafa_token)
+    state = load_state(project_id)
+    if state.get("status") != "download_ready":
+        raise HTTPException(status_code=409, detail="No completed MP4 delivery to acknowledge")
+    folder = project_dir(project_id)
+    shutil.rmtree(folder, ignore_errors=True)
+    jobs.pop(project_id, None)
+    project_locks.pop(project_id, None)
+    return {"ok": True, "deleted": True}
 
 
 @app.delete("/api/projects/{project_id}")
