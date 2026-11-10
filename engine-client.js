@@ -168,7 +168,14 @@
       anchor.click();
       anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      message.textContent = "Téléchargement lancé. Le serveur supprime le projet et les rushes après livraison.";
+      let serverCleaned = false;
+      try {
+        await request("/api/projects/" + activeProject + "/ack-download", { method: "POST" });
+        serverCleaned = true;
+      } catch (_) {}
+      message.textContent = serverCleaned
+        ? "MP4 transmis. Les vidéos sources et fichiers temporaires ont été supprimés du serveur."
+        : "MP4 transmis. Le nettoyage serveur sera assuré automatiquement à l'expiration du projet.";
       activeProject = null;
       download.hidden = true;
       window.dispatchEvent(new Event("rafa-export-complete"));
