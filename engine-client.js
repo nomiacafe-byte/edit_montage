@@ -87,6 +87,10 @@
       panel.hidden = false;
       return;
     }
+    if (!engineReady) {
+      await checkEngine();
+      if (!engineReady) return;
+    }
     const clips = Array.isArray(window.rafaClips) ? window.rafaClips : [];
     if (!clips.length) {
       message.textContent = "Ajoute d'abord tes vidéos dans la bibliothèque.";
@@ -189,7 +193,7 @@
   async function checkEngine() {
     if (!apiBase) {
       panel.hidden = false;
-      button.disabled = true;
+      button.disabled = false;
       message.textContent = "Le moteur serveur doit être déployé et configuré avant de générer un Reel.";
       return;
     }
@@ -205,9 +209,9 @@
       panel.hidden = true;
     } catch (_) {
       engineReady = false;
-      button.disabled = true;
+      button.disabled = false;
       panel.hidden = false;
-      message.textContent = "Le moteur de rendu n'est pas encore joignable. Le service backend doit être déployé sur Render avant de lancer un montage.";
+      message.textContent = "Moteur non joignable pour le moment. Appuie de nouveau sur Générer pour réessayer la connexion.";
     }
   }
 
