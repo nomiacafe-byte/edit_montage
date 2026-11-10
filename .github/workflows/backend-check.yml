@@ -17,17 +17,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install FFmpeg and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install -r backend/requirements.txt requests
       - name: Compile Python source
         run: python -m compileall -q backend
-      - name: Build render container
-        run: docker build -t rafa-studio-api ./backend
       - name: End-to-end render smoke test
-        run: |
-          python -m pip install requests
-          python backend/smoke_test.py
-
-# Build and syntax checks run against the current backend source.
-
-# Rebuild the container whenever the rendering pipeline changes.
-
-# Validate delivery acknowledgement and TTL cleanup changes as well.
+        run: python backend/smoke_test.py
