@@ -161,6 +161,37 @@ Store the creative hypothesis, hook, runtime, edit decisions and Instagram Insig
 
 This is a flexible grammar, not a mandatory formula. A video may open with the payoff and then reveal how it happened.
 
+
+## Batch import and privacy-first processing
+
+### User workflow
+- The user must be able to select many video files in one file-picker operation (target: 30–100+ clips) or drag and drop a whole batch.
+- Do not impose an arbitrary low file-count cap. Show the number of selected clips and their combined size, reject non-video files gracefully, and avoid adding exact duplicate selections twice.
+- Read lightweight metadata with bounded concurrency; do not decode every full-resolution source into memory just to build the library view.
+- Support common phone-camera formats, especially MOV and MP4. Report unsupported/corrupt files clearly rather than silently ignoring them.
+- Keep the upload/import flow simple: select once, review the batch, start one analysis job.
+
+### Temporary files only — no permanent footage library
+Rafa Studio is a production tool, not an archive. The intended lifecycle is:
+1. Source clips are selected for one editing project.
+2. Uploads, proxies, thumbnails, extracted audio and analysis artifacts exist only in temporary project storage.
+3. The editor analyses the footage, prepares the edit decision list, renders the final MP4 and offers it for download.
+4. After the MP4 is safely delivered, delete the source uploads and all derived temporary assets.
+5. Also purge temporary assets on cancellation, unrecoverable failure and abandoned-project expiry. Use a short, explicit TTL as a safety net.
+6. Keep no reusable footage archive and no permanent copies of source videos. Retain only the final MP4 on the user's device unless the user explicitly chooses otherwise.
+7. Do not claim deletion until the storage layer confirms it. Provide a clear “delete project and all source files” action and visible cleanup status.
+
+### Important implementation/security requirements
+- Use private, access-controlled temporary object storage; never make source clips public.
+- Upload large files with resumable/multipart transfer and per-file progress so a dropped connection does not force the entire batch to restart.
+- Queue analysis/render jobs; do not hold a browser request open for the entire edit.
+- Enforce file type/size validation server-side as well as client-side, and protect against archive bombs, malformed media and resource exhaustion.
+- Use short-lived signed upload/download URLs, isolate each project, and delete temporary credentials when jobs finish.
+- Store only the minimum project/job metadata needed to complete and report the render. Avoid retaining source footage or extracted media after cleanup.
+- The final MP4 should be downloaded by the user before cleanup is finalized; if delivery fails, allow a short retry window without retaining the source files indefinitely.
+
+**Current status:** the web prototype selects multiple files locally in one batch and uses temporary browser object URLs. It does not yet upload files to a server, run AI analysis or render MP4. The temporary-storage lifecycle above is a required design constraint for the backend, not a claim that backend deletion is already implemented.
+
 ## Current prototype
 `index.html` is a responsive front-end prototype with local multi-video import, clip previews, a creative brief and a downloadable brief JSON. It does **not** yet analyze footage with AI, automatically edit video, sync music, or export a finished MP4.
 
