@@ -1,5 +1,6 @@
 name: Backend checks
 on:
+  workflow_dispatch:
   push:
     paths:
       - "backend/**"
