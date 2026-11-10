@@ -153,7 +153,7 @@ def frame_metrics(path: Path, duration: float) -> list[dict[str, float]]:
 
 def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
-    for item in files:
+    for source_index, item in enumerate(files):
         path = Path(item["path"])
         meta = probe(path)
         if meta["duration"] < 1.0:
@@ -161,32 +161,43 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         samples = frame_metrics(path, meta["duration"])
         if not samples:
             continue
-        # Pick the strongest moment, then keep a short action window around it.
-        samples.sort(key=lambda x: x["score"], reverse=True)
-        best = samples[0]
-        clip_len = min(4.2, max(2.0, target_seconds / 6.0))
-        start = max(0.0, min(best["time"] - clip_len * 0.42, meta["duration"] - clip_len))
-        if meta["duration"] < clip_len:
-            clip_len = meta["duration"]
-            start = 0.0
-        candidates.append({
-            **item, "duration": meta["duration"], "has_audio": meta["has_audio"],
-            "creation_time": meta["creation_time"], "start": start,
-            "end": start + clip_len, "clip_duration": clip_len,
-            "brightness": best["brightness"], "visual_score": best["score"],
-            "moment_time": best["time"], "analysis_samples": len(samples),
-        })
+
+        # Find several separated quality peaks in long recordings.
+        peaks = sorted(samples, key=lambda x: x["score"], reverse=True)
+        chosen_peaks: list[dict[str, float]] = []
+        for sample in peaks:
+            if all(abs(sample["time"] - prev["time"]) >= 4.5 for prev in chosen_peaks):
+                chosen_peaks.append(sample)
+            if len(chosen_peaks) >= 4:
+                break
+
+        clip_len = min(4.0, max(2.2, target_seconds / 7.0))
+        for peak_index, best in enumerate(chosen_peaks):
+            start = max(0.0, min(best["time"] - clip_len * 0.45, meta["duration"] - clip_len))
+            actual_len = min(clip_len, meta["duration"] - start)
+            if actual_len < 1.2:
+                continue
+            candidates.append({
+                **item, "source_index": source_index, "candidate_index": peak_index,
+                "duration": meta["duration"], "has_audio": meta["has_audio"],
+                "creation_time": meta["creation_time"], "start": start,
+                "end": start + actual_len, "clip_duration": actual_len,
+                "brightness": best["brightness"], "visual_score": best["score"],
+                "moment_time": best["time"], "analysis_samples": len(samples),
+            })
 
     if not candidates:
         raise RuntimeError("Aucun passage vidéo exploitable n'a été détecté.")
 
-    # First select the strongest moments across the entire batch, then order those
-    # selected moments chronologically. Ranking and ordering are separate decisions.
-    chronology_mode = "visual-light-estimate"
+    # Rank by visual quality, but limit each source to two shots for variety.
     selected_pool = sorted(candidates, key=lambda c: c["visual_score"], reverse=True)
     chosen: list[dict[str, Any]] = []
+    source_counts: dict[int, int] = {}
     elapsed = 0.0
     for candidate in selected_pool:
+        source_id = int(candidate["source_index"])
+        if source_counts.get(source_id, 0) >= 2:
+            continue
         if elapsed >= target_seconds:
             break
         remaining = target_seconds - elapsed
@@ -196,24 +207,29 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         candidate["clip_duration"] = min(candidate["clip_duration"], remaining)
         candidate["end"] = candidate["start"] + candidate["clip_duration"]
         chosen.append(candidate)
+        source_counts[source_id] = source_counts.get(source_id, 0) + 1
         elapsed += candidate["clip_duration"]
 
-    # Trust embedded capture times only when most selected clips have them.
-    if chosen and len([c for c in chosen if c.get("creation_time")]) >= max(2, int(len(chosen) * 0.6)):
+    if not chosen:
+        chosen = [max(candidates, key=lambda c: c["visual_score"])]
+
+    # Prefer embedded capture time when most selected clips have trustworthy tags.
+    dated = [c for c in chosen if c.get("creation_time")]
+    chronology_mode = "visual-light-estimate"
+    if len(dated) >= max(2, int(len(chosen) * 0.6)):
         chosen.sort(key=lambda c: c.get("creation_time") or "9999")
         chronology_mode = "capture-timestamps"
     else:
-        # Brightness is a low-confidence fallback. It prevents an obvious night-to-day
-        # reversal in a likely single event, but cannot distinguish different events.
+        # Low-confidence fallback: reduce obvious night-to-day reversals.
         chosen.sort(key=lambda c: c["brightness"])
-    if not chosen:
-        chosen = [candidates[0]]
+
     audit = {
         "mode": chronology_mode,
         "selected_count": len(chosen),
+        "source_count": len({c["source_index"] for c in chosen}),
         "estimated_seconds": round(sum(c["clip_duration"] for c in chosen), 2),
         "chronology_confidence": "medium" if chronology_mode == "capture-timestamps" else "low",
-        "note": "L'ordre par luminosité est une estimation visuelle, pas une preuve de chronologie. Les clips de dates ou événements différents doivent être vérifiés.",
+        "note": "Plusieurs moments distincts sont évalués par vidéo, avec au plus deux extraits par source. L'ordre par luminosité est une estimation, pas une preuve de chronologie; les événements distincts devront être regroupés par analyse sémantique.",
     }
     return chosen, audit
 
