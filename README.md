@@ -190,7 +190,7 @@ Rafa Studio is a production tool, not an archive. The intended lifecycle is:
 - Store only the minimum project/job metadata needed to complete and report the render. Avoid retaining source footage or extracted media after cleanup.
 - The final MP4 should be downloaded by the user before cleanup is finalized; if delivery fails, allow a short retry window without retaining the source files indefinitely.
 
-**Current status:** the web prototype selects multiple files locally in one batch and uses temporary browser object URLs. It does not yet upload files to a server, run AI analysis or render MP4. The temporary-storage lifecycle above is a required design constraint for the backend, not a claim that backend deletion is already implemented.
+**Current status:** the front end now includes the one-click generation, resumable chunk upload, job progress, preview and MP4 download integration. A first server-side FFmpeg engine exists in `backend/`: it ranks candidate moments using image sharpness, exposure, saturation and motion; uses embedded capture timestamps where available or a low-confidence brightness estimate; renders a vertical MP4; and deletes project files after successful delivery or TTL expiry. The backend is source code and has a Render deployment blueprint, but it is **not yet deployed or connected to the public site**. This first deterministic engine is not semantic AI: it does not yet understand actions such as stretching dough, topping pizzas, oven work or guest reactions. Those require the next vision-model/editorial-planner milestone. Do not describe this version as a finished intelligent editor.
 
 
 ## One-click generation, preview and download
