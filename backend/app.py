@@ -299,8 +299,13 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
     dated = [c for c in chosen if c.get("creation_time")]
     chronology_mode = "visual-light-estimate"
     if len(dated) >= max(2, int(len(chosen) * 0.6)):
-        chosen.sort(key=lambda c: c.get("creation_time") or "9999")
+        # Creation time is often identical for every moment in one long source file;
+        # use the actual in-file timecode as the secondary chronological key.
+        chosen.sort(key=lambda c: (c.get("creation_time") or "9999", c["moment_time"]))
         chronology_mode = "capture-timestamps"
+    elif len({c["source_index"] for c in chosen}) == 1:
+        chosen.sort(key=lambda c: c["moment_time"])
+        chronology_mode = "single-recording-timecodes"
     else:
         # Low-confidence fallback: reduce obvious night-to-day reversals.
         chosen.sort(key=lambda c: c["brightness"])
@@ -312,7 +317,7 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         "semantic_analysis": "vision-enabled" if semantic_enabled else "visual-fallback",
         "shot_categories": [c.get("semantic_category", "unclassified") for c in chosen],
         "estimated_seconds": round(sum(c["clip_duration"] for c in chosen), 2),
-        "chronology_confidence": "medium" if chronology_mode == "capture-timestamps" else "low",
+        "chronology_confidence": "high" if chronology_mode in ("capture-timestamps", "single-recording-timecodes") else "low",
         "note": "Plusieurs moments distincts sont évalués par vidéo, avec au plus sept extraits par source pour gérer aussi un seul long enregistrement. L'ordre par luminosité est une estimation, pas une preuve de chronologie; les événements distincts devront être regroupés par analyse sémantique.",
     }
     return chosen, audit
