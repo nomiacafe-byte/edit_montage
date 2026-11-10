@@ -14,7 +14,7 @@
   const download = $("downloadFinal");
   const audit = $("chronologyAudit");
   const shotAudit = $("shotAudit");
-  let activeProject = null;
+  let activeProject = sessionStorage.getItem("rafa-studio-project") || null;
   let previewUrl = null;
   let busy = false;
   let engineReady = false;
@@ -145,6 +145,7 @@
       });
       const created = await create.json();
       activeProject = created.project_id;
+      sessionStorage.setItem("rafa-studio-project", activeProject);
       const completedFiles = [];
       let uploadedBefore = 0;
       for (let i = 0; i < clips.length; i++) {
@@ -176,6 +177,7 @@
         try { await request("/api/projects/" + activeProject, { method: "DELETE" }); } catch (_) {}
       }
       activeProject = null;
+      sessionStorage.removeItem("rafa-studio-project");
     } finally {
       busy = false;
       button.disabled = !engineReady;
@@ -206,6 +208,7 @@
         ? "MP4 transmis. Les vidéos sources et fichiers temporaires ont été supprimés du serveur."
         : "MP4 transmis. Le nettoyage serveur sera assuré automatiquement à l'expiration du projet.";
       activeProject = null;
+      sessionStorage.removeItem("rafa-studio-project");
       download.hidden = true;
       window.dispatchEvent(new Event("rafa-export-complete"));
     } catch (error) {
@@ -241,6 +244,50 @@
   }
 
 
+
+  async function resumeExistingProject() {
+    if (!activeProject || !apiBase) return;
+    panel.hidden = false;
+    if (!token) {
+      accessPanel.hidden = false;
+      accessMessage.textContent = "Déverrouille le studio pour reprendre ton montage.";
+      message.textContent = "Un montage est en cours ou prêt à être récupéré.";
+      return;
+    }
+    busy = true;
+    button.disabled = true;
+    try {
+      const response = await request("/api/projects/" + activeProject);
+      let job = await response.json();
+      if (job.status === "uploading") {
+        await request("/api/projects/" + activeProject, { method: "DELETE" });
+        activeProject = null;
+        sessionStorage.removeItem("rafa-studio-project");
+        message.textContent = "Le téléversement avait été interrompu avant la fin. Les fichiers temporaires incomplets ont été supprimés; sélectionne à nouveau tes vidéos.";
+        return;
+      }
+      if (job.status === "queued" || job.status === "analyzing" || job.status === "rendering") {
+        job = await pollJob(activeProject);
+      }
+      if (job.status === "preview_ready" || job.status === "download_ready") {
+        const previewResponse = await request("/api/projects/" + activeProject + "/preview");
+        const blob = await previewResponse.blob();
+        previewUrl = URL.createObjectURL(blob);
+        preview.src = previewUrl;
+        preview.hidden = false;
+        download.hidden = false;
+        setProgress(100, "Ton aperçu est prêt. Le montage a été récupéré après reconnexion.");
+      } else if (job.status === "error") {
+        throw new Error(job.error || job.message || "Le montage a échoué.");
+      }
+    } catch (error) {
+      message.textContent = "Impossible de reprendre le projet : " + error.message;
+    } finally {
+      busy = false;
+      button.disabled = false;
+    }
+  }
+
   async function login() {
     if (!apiBase) return;
     unlock.disabled = true;
@@ -259,6 +306,7 @@
       accessPanel.hidden = true;
       accessMessage.textContent = "";
       message.textContent = "Accès privé confirmé. Tu peux générer ton Reel.";
+      if (activeProject) resumeExistingProject();
     } catch (error) {
       accessMessage.textContent = error.message;
     } finally {
@@ -269,6 +317,7 @@
   unlock.addEventListener("click", login);
   accessPassword.addEventListener("keydown", event => { if (event.key === "Enter") login(); });
   button.addEventListener("click", generate);
+  if (activeProject) resumeExistingProject();
   download.addEventListener("click", downloadFinal);
   if (!apiBase) {
     button.title = "Le moteur serveur doit être déployé avant la génération.";
