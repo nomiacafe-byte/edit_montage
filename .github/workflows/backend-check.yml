@@ -23,3 +23,5 @@ jobs:
         run: docker build -t rafa-studio-api ./backend
 
 # Build and syntax checks run against the current backend source.
+
+# Rebuild the container whenever the rendering pipeline changes.
