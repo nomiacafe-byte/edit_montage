@@ -1,8 +1,12 @@
 (() => {
   const apiBase = String(window.RAFA_API_BASE || "").replace(/\/$/, "");
-  const token = window.RAFA_API_TOKEN || "";
+  let token = sessionStorage.getItem("rafa-studio-session") || window.RAFA_API_TOKEN || "";
   const $ = (id) => document.getElementById(id);
   const button = $("generate");
+  const accessPanel = $("accessPanel");
+  const accessPassword = $("accessPassword");
+  const accessMessage = $("accessMessage");
+  const unlock = $("unlock");
   const panel = $("renderPanel");
   const progress = $("renderProgress");
   const message = $("renderMessage");
@@ -87,6 +91,12 @@
     if (!apiBase) {
       message.textContent = "Le moteur serveur n'est pas configuré. Déploie le service backend, puis renseigne config.js.";
       panel.hidden = false;
+      return;
+    }
+    if (!token && !window.RAFA_API_TOKEN) {
+      accessPanel.hidden = false;
+      accessMessage.textContent = "Entre le mot de passe privé configuré pour le serveur Rafa Studio.";
+      accessPassword.focus();
       return;
     }
     if (!engineReady) {
@@ -217,6 +227,34 @@
     }
   }
 
+
+  async function login() {
+    if (!apiBase) return;
+    unlock.disabled = true;
+    accessMessage.textContent = "Vérification de l'accès…";
+    try {
+      const response = await fetch(apiBase + "/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: accessPassword.value })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || "Connexion impossible");
+      token = result.token;
+      sessionStorage.setItem("rafa-studio-session", token);
+      accessPassword.value = "";
+      accessPanel.hidden = true;
+      accessMessage.textContent = "";
+      message.textContent = "Accès privé confirmé. Tu peux générer ton Reel.";
+    } catch (error) {
+      accessMessage.textContent = error.message;
+    } finally {
+      unlock.disabled = false;
+    }
+  }
+
+  unlock.addEventListener("click", login);
+  accessPassword.addEventListener("keydown", event => { if (event.key === "Enter") login(); });
   button.addEventListener("click", generate);
   download.addEventListener("click", downloadFinal);
   if (!apiBase) {
