@@ -44,6 +44,53 @@ Do not collapse these into a single opaque score. A strong creative contrast can
 - **Single-event story:** preserve the event's natural progression when useful, from arrival/setup through preparation, cooking, service and guest experience.
 - **Multi-event brand recap:** build a thematic progression across events (craft, energy, hospitality, abundance, signature pizzas) rather than stitching together unrelated highlights. The sequence should feel like one film about Rafa Pizza, not a random slideshow of past jobs.
 
+## Signature story arc: one Reel, one clear journey
+
+The default Rafa Pizza Reel should feel like a short, complete story with a visible beginning, progression and payoff. The viewer should understand the journey without needing captions to explain disconnected images.
+
+### Preferred narrative progression
+This is a flexible editorial backbone, not a rigid shot checklist. Use the best available footage and adapt the order when the story benefits:
+1. **Hook:** open on a compelling sensory or human moment that creates curiosity (a finished pizza reveal, a dramatic dough stretch, a lively guest reaction, a pizza entering/leaving the oven). The hook may tease a later payoff.
+2. **The craft begins:** show Rafa and the team stretching dough. Establish hands, technique, movement and the human work behind the food.
+3. **The pizza takes shape:** move naturally into sauce, ingredients and topping. Make the transformation legible; use close-ups and action matches so the viewer feels the pizza progressing.
+4. **The experience comes alive:** weave in guests, service and atmosphere at a point where they deepen the story. Customer shots should feel connected to the food and hospitality, not randomly inserted as filler.
+5. **Heat and transformation:** show the oven, baking, finishing gestures or the final reveal. This should feel like the consequence of the preparation viewers have just watched.
+6. **Payoff and emotional close:** deliver the finished pizza, a slice, a shared moment or a memorable team/guest image. End on warmth, appetite, energy and the Rafa identity.
+
+The edit can start with the payoff and then travel back to the beginning, but it must return to a satisfying resolution. It may intercut people and process when the cut has a clear relationship (for example, a guest arriving while a pizza is being finished). Never shuffle stages arbitrarily.
+
+### Narrative logic and viewer emotion
+- Define one sentence describing what this Reel is about before selecting the sequence.
+- Give every shot a narrative role: hook, establish, craft, transform, human connection, anticipation, payoff or close.
+- Build cause-and-effect where possible: dough is stretched, toppings are added, the pizza is baked, it is served and enjoyed.
+- Build anticipation by withholding the full reveal just long enough to make the viewer want it, without confusing them.
+- Let positive emotion rise through visible teamwork, confidence, generosity, lively service, delicious food and genuine guest moments. Do not manufacture reactions or stage false event continuity.
+- Use human moments to give meaning to the craft; use food moments to reward the human story.
+- Maintain a coherent energy curve: curiosity → immersion → rising energy → sensory reward → warm memorable finish.
+- A beautiful shot that interrupts the story should be moved, shortened or removed. Story clarity outranks the number of attractive shots included.
+
+### Rafa brand feeling
+The film should communicate the Rafa Pizza identity through the footage and its treatment, not rely on a logo slapped at the end. Aim for a recognizable blend of:
+- creative, confident pizza craft;
+- warm, welcoming hospitality;
+- lively, convivial event energy;
+- premium but unpretentious presentation;
+- tactile food imagery and human connection.
+
+Use the established Rafa visual language consistently (including its burgundy and warm cream/beige palette where graphic elements are appropriate), while preserving the natural colors of the food and locations. Avoid heavy filters that make different events look artificially identical.
+
+### Storyboard test before rendering
+Before rendering, the editor must be able to answer:
+- What is the story in one sentence?
+- What question or promise does the opening hook create?
+- Can a first-time viewer follow the order of preparation and experience?
+- Does each transition connect by action, meaning, emotion, sound or intentional contrast?
+- Do the guest moments enrich the process rather than interrupt it?
+- Does the oven/finalization sequence pay off what the opening promised?
+- Does the ending leave a positive feeling and a clear impression of Rafa Pizza?
+
+If the sequence fails these questions, rebuild the order before polishing effects or color.
+
 ## Long-footage intelligence pipeline
 1. **Ingest and inspect:** read duration, frame rate, resolution, orientation, audio tracks and codec; create proxy/thumbnail assets without altering originals.
 2. **Detect structure:** identify shot/scene boundaries, camera movement, changes in framing, silence/speech/music and meaningful action phases.
