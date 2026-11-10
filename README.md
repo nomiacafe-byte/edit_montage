@@ -192,8 +192,39 @@ Rafa Studio is a production tool, not an archive. The intended lifecycle is:
 
 **Current status:** the web prototype selects multiple files locally in one batch and uses temporary browser object URLs. It does not yet upload files to a server, run AI analysis or render MP4. The temporary-storage lifecycle above is a required design constraint for the backend, not a claim that backend deletion is already implemented.
 
+
+## One-click generation, preview and download
+The intended end-user flow must be simple and explicit:
+1. Select or drop the full batch of source videos.
+2. Review the imported clips and their upload status.
+3. Press one primary **“Générer la vidéo”** button to launch the complete creative pipeline.
+4. Show meaningful progress stages while the job runs (upload, media inspection, moment selection, story assembly, continuity review, preview render, final render).
+5. Produce a 20–30 second vertical Reel (shorter when the footage supports a stronger story).
+6. Present an in-page playable preview of the generated edit before final download.
+7. Let the user approve the preview, request a revision, or download the final MP4.
+8. After successful delivery/download, purge all source footage and temporary derivatives according to the privacy lifecycle above.
+
+The generation button must not be a fake/demo action: it should be enabled only when the batch is valid and the real processing service is available. The UI must communicate queueing, progress, recoverable errors and completion clearly. A long-running edit must continue as a background job if the user navigates away or the mobile browser temporarily loses focus; reconnecting should restore the job status.
+
+### Chronology and lighting continuity — mandatory
+Rafa Studio must infer the likely real-world time progression across the selected footage, especially when multiple clips come from one event:
+- Estimate relative time-of-day from exposure, ambient light, window/daylight, artificial lighting, sky/background cues and visual changes across clips. Use capture timestamps and file metadata when trustworthy, but never assume filenames or picker order are chronological.
+- Build a confidence-rated chronology graph for clips and candidate moments. Distinguish strong evidence (reliable capture timestamps or clear continuous visual progression) from weaker visual estimates.
+- **Do not create an accidental time reversal.** If the event visibly progresses from daylight to dusk to night, the edit must not jump from night back to bright daylight later in the story.
+- When chronology is uncertain, prefer an order that avoids obvious light reversals, or use an intentional thematic/multi-event structure only when the change is visually legible and not misleading.
+- Do not force all footage into one chronology if it comes from different events/dates. First infer event groups; preserve temporal progression within each group, then bridge groups intentionally.
+- Treat lighting continuity as a story constraint, not merely a color-grading problem. Color correction may gently harmonize exposure/white balance, but must never disguise a real passage of time or make night footage look like day.
+- Before rendering, run an explicit chronology audit over the proposed shot order. Flag any daylight/dusk/night reversal and either reorder the shots or explain why the contrast is intentional.
+- If the system cannot confidently determine the order, flag the uncertainty for review instead of inventing a precise timeline.
+
+### Preview and final delivery
+- Render a lightweight review preview first, with the actual proposed shot order, trims, transitions, crop and sound treatment.
+- Preview must be playable directly in Rafa Studio, with clear **“Télécharger le MP4”** and revision/approval controls.
+- The final MP4 is rendered only after the preview passes the quality gate or the user approves it. The preview must be representative of the final edit, not a different storyboard mock-up.
+- Preserve a safe delivery window: do not delete source material until the final MP4 is available to download and delivery has been confirmed; then clean up source and derivative files, with a short retry window if download fails.
+
 ## Current prototype
-`index.html` is a responsive front-end prototype with local multi-video import, clip previews, a creative brief and a downloadable brief JSON. It does **not** yet analyze footage with AI, automatically edit video, sync music, or export a finished MP4.
+`index.html` is a responsive front-end prototype with local multi-video import and clip previews. It does **not** yet upload footage to a server, run the AI analysis/editing pipeline, generate a playable preview, or export a finished MP4. The one-click generation, chronology audit, preview/approval and MP4 download described above are required product behavior for the production implementation.
 
 ## Engineering milestones
 1. Clip ingestion, proxy generation, metadata extraction and thumbnail/contact-sheet creation.
