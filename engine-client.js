@@ -119,13 +119,14 @@
 
   function chooseShots(candidates, clips) {
     const single = clips.length === 1;
+    candidates = candidates.filter(item => item.duration >= 1.2);
     const sorted = [...candidates].sort((a, b) => b.score - a.score);
     const selected = [];
     for (const item of sorted) {
       if (selected.length >= 12) break;
       const same = selected.filter(s => s.clip === item.clip);
       if (single ? same.some(s => Math.abs(s.time - item.time) < 2.8) : same.length >= 1 || same.some(s => Math.abs(s.time - item.time) < 3.5)) continue;
-      const shotLength = Math.min(2.2, Math.max(1.1, item.duration - 0.15));
+      const shotLength = Math.min(2.2, item.duration - 0.05);
       if (item.duration > shotLength + 0.2 && (item.time < 0.35 || item.time > item.duration - 0.35)) continue;
       selected.push({ ...item, start: Math.max(0, Math.min(item.duration - shotLength, item.time - shotLength * 0.48)), length: shotLength });
     }
@@ -133,7 +134,7 @@
       for (const item of sorted) {
         if (selected.length >= 12) break;
         if (selected.some(s => s.clip === item.clip && Math.abs(s.time - item.time) < 1.7)) continue;
-        const shotLength = Math.min(2.2, Math.max(1.1, item.duration - 0.15));
+        const shotLength = Math.min(2.2, item.duration - 0.05);
         selected.push({ ...item, start: Math.max(0, Math.min(item.duration - shotLength, item.time - shotLength * 0.48)), length: shotLength });
       }
     }
@@ -153,7 +154,7 @@
     ctx.drawImage(video, (width - sw) / 2, (height - sh) / 2, sw, sh);
   }
 
-  async function renderShots(shots) {
+  async function renderShots(shots, audioContext) {
     if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
       throw new Error("Safari ne permet pas le rendu vidéo local sur cette version. Mets iOS à jour ou ouvre Rafa Studio dans Safari.");
     }
@@ -166,11 +167,11 @@
     video.playsInline = true;
     video.muted = false;
     video.volume = 1;
-    let audioContext = null, audioStream = null;
+    video.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+    document.body.appendChild(video);
+    let audioStream = null;
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        audioContext = new AudioCtx();
+      if (audioContext) {
         const source = audioContext.createMediaElementSource(video);
         const gain = audioContext.createGain();
         const destination = audioContext.createMediaStreamDestination();
@@ -233,7 +234,7 @@
       video.removeAttribute("src");
       video.load();
       stream.getTracks().forEach(track => track.stop());
-      if (audioContext) await audioContext.close().catch(() => {});
+      video.remove();
     }
     const blob = new Blob(chunks, { type: mime.split(";")[0] });
     if (!blob.size) throw new Error("Le fichier exporté est vide. Réessaie avec moins de vidéos.");
@@ -251,6 +252,11 @@
     outputBlob = null; outputUrl = null;
     try {
       setProgress(1, "Préparation de l'analyse locale sur ton iPhone…");
+      let audioContext = null;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        try { audioContext = new AudioCtx(); await audioContext.resume(); } catch (_) { audioContext = null; }
+      }
       const candidates = await analyseClips(clips);
       const shots = chooseShots(candidates, clips);
       if (shots.length < 5) throw new Error("Pas assez de passages exploitables. Ajoute des vidéos plus longues ou mieux éclairées.");
@@ -260,7 +266,8 @@
         ? "Chronologie interne respectée · passages sélectionnés dans l'enregistrement."
         : "Ordre approximatif selon les dates de fichiers disponibles · vérifie la progression jour/soir, car Safari ne donne pas toujours la date réelle de tournage.";
       setProgress(42, "Analyse terminée · " + shots.length + " passages sélectionnés · " + Math.round(total) + " secondes.");
-      outputBlob = await renderShots(shots);
+      outputBlob = await renderShots(shots, audioContext);
+      if (audioContext) { await audioContext.close().catch(() => {}); audioContext = null; }
       outputUrl = URL.createObjectURL(outputBlob);
       preview.src = outputUrl;
       preview.hidden = false;
