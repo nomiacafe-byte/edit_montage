@@ -1,4 +1,4 @@
-// Set this to the deployed Render API origin after deploying the backend.
-// Example: window.RAFA_API_BASE = "https://rafa-studio-api.onrender.com";
-window.RAFA_API_BASE = "https://rafa-studio-api.onrender.com";
+// Add the exact backend URL after creating the Rafa Studio service from render.yaml.
+// Keep blank until the service has been deployed and its /health endpoint verified.
+window.RAFA_API_BASE = "";
 window.RAFA_API_TOKEN = "";
