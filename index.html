@@ -119,7 +119,7 @@ function updateSummary(){
  batchCount.textContent=clips.length?clips.length+' vidéo(s) sélectionnée(s)':'Aucun lot importé';
  batchSize.textContent=bytes(total/1048576);
 }
-function render(){
+function render(){\n window.rafaClips=clips;
  updateSummary();
  grid.innerHTML='';
  if(!clips.length){
@@ -250,4 +250,4 @@ window.addEventListener('beforeunload',()=>{
  clips.forEach(clip=>URL.revokeObjectURL(clip.url));
 });
 </script>
-</body></html>
+<script src="./config.js"></script>\n<script src="./engine-client.js"></script>\n</body></html>
