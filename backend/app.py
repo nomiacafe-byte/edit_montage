@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import time
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +87,8 @@ def probe(path: Path) -> dict[str, Any]:
     streams = data.get("streams", [])
     fmt = data.get("format", {})
     tags = fmt.get("tags", {}) or {}
+    if not tags.get("creation_time"):
+        tags = next((stream.get("tags", {}) for stream in streams if (stream.get("tags", {}) or {}).get("creation_time")), tags)
     return {
         "duration": max(0.0, float(fmt.get("duration", 0) or 0)),
         "has_audio": any(s.get("codec_type") == "audio" for s in streams),
@@ -167,7 +168,6 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
 
     # First select the strongest moments across the entire batch, then order those
     # selected moments chronologically. Ranking and ordering are separate decisions.
-    dated = [c for c in candidates if c.get("creation_time")]
     chronology_mode = "visual-light-estimate"
     selected_pool = sorted(candidates, key=lambda c: c["visual_score"], reverse=True)
     chosen: list[dict[str, Any]] = []
