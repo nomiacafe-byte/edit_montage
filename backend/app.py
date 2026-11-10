@@ -562,7 +562,7 @@ def preview(project_id: str, x_rafa_token: str | None = Header(default=None)):
     guard(x_rafa_token)
     state = load_state(project_id)
     path = state.get("output_path")
-    if state.get("status") != "preview_ready" or not path or not Path(path).exists():
+    if state.get("status") not in ("preview_ready", "download_ready") or not path or not Path(path).exists():
         raise HTTPException(status_code=409, detail="Preview is not ready")
     return FileResponse(path, media_type="video/mp4", filename="rafa-studio-preview.mp4")
 
