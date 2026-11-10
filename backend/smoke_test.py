@@ -1,33 +1,43 @@
+import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import requests
 
+ROOT = Path(__file__).resolve().parent
 BASE = "http://127.0.0.1:8080"
-container = "rafa-studio-smoke"
-sample = Path("rafa-smoke.mp4")
+sample = ROOT / "rafa-smoke.mp4"
+env = os.environ.copy()
+env.pop("RAFA_ACCESS_PASSWORD", None)
+env.pop("RAFA_API_TOKEN", None)
+env.pop("RAFA_SESSION_SECRET", None)
+server = subprocess.Popen(
+    [sys.executable, "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "8080"],
+    cwd=ROOT,
+    env=env,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
 
 
 def run(*args):
-    subprocess.run(args, check=True)
+    subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 try:
-    run("docker", "run", "-d", "--rm", "--name", container, "-p", "8080:8080", "rafa-studio-api")
     for _ in range(60):
         try:
             if requests.get(BASE + "/health", timeout=2).ok:
                 break
         except requests.RequestException:
-            time.sleep(2)
+            time.sleep(1)
     else:
         raise RuntimeError("API did not become healthy")
 
-    run("docker", "exec", container, "ffmpeg", "-y", "-f", "lavfi", "-i",
-        "testsrc2=size=640x480:rate=25", "-t", "7", "-c:v", "libx264",
-        "-pix_fmt", "yuv420p", "/tmp/rafa-smoke.mp4")
-    run("docker", "cp", container + ":/tmp/rafa-smoke.mp4", str(sample))
+    run("ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x480:rate=25",
+        "-t", "7", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(sample))
 
     created = requests.post(BASE + "/api/projects", json={"filenames": [sample.name]}, timeout=20)
     created.raise_for_status()
@@ -74,7 +84,9 @@ try:
 
     print("Smoke test passed: upload -> analyze -> FFmpeg MP4 -> preview -> download -> cleanup")
 finally:
-    run("docker", "rm", "-f", container) if subprocess.run(
-        ["docker", "ps", "-aq", "-f", f"name={container}"], capture_output=True, text=True
-    ).stdout.strip() else None
+    server.terminate()
+    try:
+        server.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        server.kill()
     sample.unlink(missing_ok=True)
