@@ -19,7 +19,7 @@ The service needs a paid CPU instance for dependable video processing. Its worki
 - `POST /api/projects/{id}/complete` — join chunks and queue the edit
 - `GET /api/projects/{id}` — job status and editorial audit
 - `GET /api/projects/{id}/preview` — playable MP4 preview
-- `GET /api/projects/{id}/download` — final MP4; project is deleted after delivery
+- `GET /api/projects/{id}/download` — final MP4 transfer\n- `POST /api/projects/{id}/ack-download` — confirm complete transfer and delete all source/intermediate files
 - `DELETE /api/projects/{id}` — cancel and delete a project
 
 Optional `X-Rafa-Token` authentication is supported through `RAFA_API_TOKEN`. Do not place a long-lived secret in a public static front end. Before public launch, put the API behind an authenticated upload gateway/rate limiter and add durable job storage/queueing.
