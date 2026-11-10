@@ -318,12 +318,14 @@ async def upload_chunk(project_id: str, file_id: str, chunk_index: int, file: Up
     data = await file.read(8 * 1024 * 1024 + 1)
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Chunk exceeds 8 MB")
-    current_bytes = sum(p.stat().st_size for p in folder.rglob("*.part"))
-    if current_bytes + len(data) > MAX_PROJECT_BYTES:
-        raise HTTPException(status_code=413, detail="Project exceeds total size limit")
     chunk_dir = folder / "chunks" / file_id
     chunk_dir.mkdir(parents=True, exist_ok=True)
-    (chunk_dir / f"{chunk_index:06d}.part").write_bytes(data)
+    chunk_path = chunk_dir / f"{chunk_index:06d}.part"
+    current_bytes = sum(p.stat().st_size for p in folder.rglob("*.part"))
+    previous_size = chunk_path.stat().st_size if chunk_path.exists() else 0
+    if current_bytes - previous_size + len(data) > MAX_PROJECT_BYTES:
+        raise HTTPException(status_code=413, detail="Project exceeds total size limit")
+    chunk_path.write_bytes(data)
     state = load_state(project_id)
     state["updated_at"] = time.time()
     save_state(project_id)
