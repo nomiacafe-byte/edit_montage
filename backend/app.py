@@ -35,7 +35,8 @@ app.add_middleware(
 )
 
 jobs: dict[str, dict[str, Any]] = {}
-project_locks: dict[str, asyncio.Lock] = {}\ncreation_events: dict[str, list[float]] = {}
+project_locks: dict[str, asyncio.Lock] = {}
+creation_events: dict[str, list[float]] = {}
 
 
 def guard(token: str | None) -> None:
@@ -70,7 +71,20 @@ def load_state(project_id: str) -> dict[str, Any]:
     return state
 
 
-def enforce_creation_limit(ip: str) -> None:\n    now = time.time()\n    events = [t for t in creation_events.get(ip, []) if now - t < 3600]\n    active = sum(1 for state in jobs.values() if state.get("owner_ip") == ip and state.get("status") not in ("error", "downloading"))\n    if len(events) >= 5 or active >= 2:\n        raise HTTPException(status_code=429, detail="Trop de projets actifs. Réessaie plus tard.")\n    events.append(now)\n    creation_events[ip] = events\n\n\ndef run_cmd(args: list[str], timeout: int = 3600) -> str:
+def enforce_creation_limit(ip: str) -> None:
+    now = time.time()
+    events = [t for t in creation_events.get(ip, []) if now - t < 3600]
+    active = sum(
+        1 for state in jobs.values()
+        if state.get("owner_ip") == ip and state.get("status") not in ("error", "downloading")
+    )
+    if len(events) >= 5 or active >= 2:
+        raise HTTPException(status_code=429, detail="Trop de projets actifs. Réessaie plus tard.")
+    events.append(now)
+    creation_events[ip] = events
+
+
+def run_cmd(args: list[str], timeout: int = 3600) -> str:
     proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
     if proc.returncode:
         raise RuntimeError((proc.stderr or proc.stdout)[-5000:])
@@ -278,8 +292,10 @@ def health():
 
 
 @app.post("/api/projects")
-def create_project(payload: ProjectCreate, x_rafa_token: str | None = Header(default=None)):
+def create_project(payload: ProjectCreate, request: Request, x_rafa_token: str | None = Header(default=None)):
     guard(x_rafa_token)
+    client_ip = request.client.host if request.client else "unknown"
+    enforce_creation_limit(client_ip)
     project_id = uuid.uuid4().hex
     folder = ROOT / project_id
     (folder / "chunks").mkdir(parents=True)
@@ -302,6 +318,9 @@ async def upload_chunk(project_id: str, file_id: str, chunk_index: int, file: Up
     data = await file.read(8 * 1024 * 1024 + 1)
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Chunk exceeds 8 MB")
+    current_bytes = sum(p.stat().st_size for p in folder.rglob("*.part"))
+    if current_bytes + len(data) > MAX_PROJECT_BYTES:
+        raise HTTPException(status_code=413, detail="Project exceeds total size limit")
     chunk_dir = folder / "chunks" / file_id
     chunk_dir.mkdir(parents=True, exist_ok=True)
     (chunk_dir / f"{chunk_index:06d}.part").write_bytes(data)
