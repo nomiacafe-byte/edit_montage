@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: rafa-studio-api
+    runtime: docker
+    rootDir: backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: RAFA_CORS_ORIGINS
+        value: https://nomiacafe-byte.github.io
+      - key: RAFA_PROJECT_TTL_SECONDS
+        value: "21600"
+      - key: RAFA_MAX_FILE_BYTES
+        value: "1073741824"
+      - key: RAFA_MAX_PROJECT_BYTES
+        value: "5368709120"
