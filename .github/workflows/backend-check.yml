@@ -21,3 +21,5 @@ jobs:
         run: python -m compileall -q backend
       - name: Build render container
         run: docker build -t rafa-studio-api ./backend
+
+# Build and syntax checks run against the current backend source.
