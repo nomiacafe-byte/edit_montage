@@ -190,7 +190,7 @@ Rafa Studio is a production tool, not an archive. The intended lifecycle is:
 - Store only the minimum project/job metadata needed to complete and report the render. Avoid retaining source footage or extracted media after cleanup.
 - The final MP4 should be downloaded by the user before cleanup is finalized; if delivery fails, allow a short retry window without retaining the source files indefinitely.
 
-**Current status:** the front end now includes the one-click generation, resumable chunk upload, job progress, preview and MP4 download integration. A first server-side FFmpeg engine exists in `backend/`: it ranks candidate moments using image sharpness, exposure, saturation and motion; uses embedded capture timestamps where available or a low-confidence brightness estimate; renders a vertical MP4; and deletes project files after successful delivery or TTL expiry. The backend is source code and has a Render deployment blueprint, but it is **not yet deployed or connected to the public site**. This first deterministic engine is not semantic AI: it does not yet understand actions such as stretching dough, topping pizzas, oven work or guest reactions. Those require the next vision-model/editorial-planner milestone. Do not describe this version as a finished intelligent editor.
+**Current status:** the front end includes batch import, one-click generation, resumable chunk upload, job progress, MP4 preview and download integration. The backend includes a real FFmpeg render pipeline and multi-moment selection for long recordings. If `OPENAI_API_KEY` is configured on the server, sampled low-resolution still frames (not source videos) are sent to the OpenAI Responses API for semantic labels such as dough, topping, guests, oven and finished pizza. It uses capture timestamps where available or a low-confidence brightness estimate as a chronology fallback. The Render backend is source code with automated container/smoke-test workflows, but it is **not yet deployed or connected to the public site**. Full event grouping, action-phase boundaries, audio-aware edits and an intelligent narrative/transition planner remain unfinished. Do not describe the current version as a finished elite editor.
 
 
 ## One-click generation, preview and download
@@ -223,8 +223,8 @@ Rafa Studio must infer the likely real-world time progression across the selecte
 - The final MP4 is rendered only after the preview passes the quality gate or the user approves it. The preview must be representative of the final edit, not a different storyboard mock-up.
 - Preserve a safe delivery window: do not delete source material until the final MP4 is available to download and delivery has been confirmed; then clean up source and derivative files, with a short retry window if download fails.
 
-## Current prototype
-`index.html` is a responsive front-end prototype with local multi-video import and clip previews. It does **not** yet upload footage to a server, run the AI analysis/editing pipeline, generate a playable preview, or export a finished MP4. The one-click generation, chronology audit, preview/approval and MP4 download described above are required product behavior for the production implementation.
+## Current implementation
+`index.html` provides batch import and the generation/preview/download interface. `engine-client.js` manages chunked uploads, job polling, preview playback and final MP4 delivery acknowledgement. `backend/app.py` provides the temporary project API, sampled-frame analysis, optional vision classification, FFmpeg rendering and cleanup. The API URL remains intentionally blank in `config.js` until the backend is deployed and its health endpoint is verified.
 
 ## Engineering milestones
 1. Clip ingestion, proxy generation, metadata extraction and thumbnail/contact-sheet creation.
