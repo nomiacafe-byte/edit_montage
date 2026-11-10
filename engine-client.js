@@ -170,6 +170,7 @@
       message.textContent = "Téléchargement lancé. Le serveur supprime le projet et les rushes après livraison.";
       activeProject = null;
       download.hidden = true;
+      window.dispatchEvent(new Event("rafa-export-complete"));
     } catch (error) {
       message.textContent = "Téléchargement non terminé : " + error.message + ". Le projet reste disponible pour réessayer.";
     } finally {
