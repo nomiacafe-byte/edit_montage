@@ -14,3 +14,7 @@ services:
         value: "1073741824"
       - key: RAFA_MAX_PROJECT_BYTES
         value: "5368709120"
+      - key: RAFA_VISION_MODEL
+        value: gpt-5.5
+      - key: OPENAI_API_KEY
+        sync: false
