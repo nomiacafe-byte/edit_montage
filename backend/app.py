@@ -25,6 +25,8 @@ MAX_FILE_BYTES = int(os.getenv("RAFA_MAX_FILE_BYTES", str(1024 * 1024 * 1024)))
 MAX_PROJECT_BYTES = int(os.getenv("RAFA_MAX_PROJECT_BYTES", str(5 * 1024 * 1024 * 1024)))
 PROJECT_TTL = int(os.getenv("RAFA_PROJECT_TTL_SECONDS", str(6 * 60 * 60)))
 API_TOKEN = os.getenv("RAFA_API_TOKEN", "")
+ACCESS_PASSWORD = os.getenv("RAFA_ACCESS_PASSWORD", "")
+SESSION_SECRET = os.getenv("RAFA_SESSION_SECRET", "")
 CORS_ORIGINS = [x.strip() for x in os.getenv("RAFA_CORS_ORIGINS", "*").split(",") if x.strip()]
 
 app = FastAPI(title="Rafa Studio Render API", version="0.1.1")
@@ -41,10 +43,33 @@ project_locks: dict[str, asyncio.Lock] = {}
 creation_events: dict[str, list[float]] = {}
 
 
-def guard(token: str | None) -> None:
-    if API_TOKEN and token != API_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid API token")
+def issue_session() -> str:
+    expires = str(int(time.time()) + 43200)
+    signature = hmac.new(SESSION_SECRET.encode(), expires.encode(), hashlib.sha256).hexdigest()
+    return expires + "." + signature
 
+
+def valid_session(token: str | None) -> bool:
+    if not token or not SESSION_SECRET:
+        return False
+    try:
+        expires, signature = token.split(".", 1)
+        if int(expires) < int(time.time()):
+            return False
+        expected = hmac.new(SESSION_SECRET.encode(), expires.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(signature, expected)
+    except (ValueError, TypeError):
+        return False
+
+
+def guard(token: str | None) -> None:
+    if API_TOKEN and hmac.compare_digest(token or "", API_TOKEN):
+        return
+    if ACCESS_PASSWORD and valid_session(token):
+        return
+    if not API_TOKEN and not ACCESS_PASSWORD:
+        raise HTTPException(status_code=503, detail="Configure backend access before accepting uploads")
+    raise HTTPException(status_code=401, detail="Session expired or access denied")
 
 def project_dir(project_id: str) -> Path:
     if not project_id.isalnum():
@@ -390,6 +415,27 @@ class FileComplete(BaseModel):
 class CompleteProject(BaseModel):
     files: list[FileComplete] = Field(min_length=1, max_length=1000)
 
+
+class LoginPayload(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginPayload, request: Request):
+    if not ACCESS_PASSWORD or not SESSION_SECRET:
+        raise HTTPException(status_code=503, detail="Backend access password is not configured")
+    ip = request.client.host if request.client else "unknown"
+    key = "login:" + ip
+    now = time.time()
+    attempts = [stamp for stamp in creation_events.get(key, []) if now - stamp < 900]
+    if len(attempts) >= 10:
+        raise HTTPException(status_code=429, detail="Too many login attempts")
+    attempts.append(now)
+    creation_events[key] = attempts
+    if not hmac.compare_digest(payload.password, ACCESS_PASSWORD):
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    creation_events.pop(key, None)
+    return {"token": issue_session(), "expires_in": 43200}
 
 @app.get("/health")
 def health():
