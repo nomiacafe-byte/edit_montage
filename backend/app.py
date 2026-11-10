@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 ROOT = Path(os.getenv("RAFA_WORK_DIR", "/tmp/rafa-studio"))
@@ -31,7 +31,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS if CORS_ORIGINS != ["*"] else ["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Rafa-Token"],
 )
 
@@ -81,7 +81,7 @@ def run_cmd(args: list[str], timeout: int = 3600) -> str:
 def probe(path: Path) -> dict[str, Any]:
     raw = run_cmd([
         "ffprobe", "-v", "error", "-show_entries",
-        "format=duration:format_tags=creation_time:stream=codec_type,width,height,r_frame_rate",
+        "format=duration:format_tags=creation_time:stream=codec_type,width,height,r_frame_rate:stream_tags=creation_time",
         "-of", "json", str(path)
     ], timeout=120)
     data = json.loads(raw)
@@ -165,22 +165,14 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
     if not candidates:
         raise RuntimeError("Aucun passage vidéo exploitable n'a été détecté.")
 
-    # Prefer source metadata chronology when the majority of clips have trustworthy timestamps.
+    # First select the strongest moments across the entire batch, then order those
+    # selected moments chronologically. Ranking and ordering are separate decisions.
     dated = [c for c in candidates if c.get("creation_time")]
     chronology_mode = "visual-light-estimate"
-    if len(dated) >= max(2, int(len(candidates) * 0.6)):
-        try:
-            candidates.sort(key=lambda c: c.get("creation_time") or "9999")
-            chronology_mode = "capture-timestamps"
-        except Exception:
-            candidates.sort(key=lambda c: c["brightness"])
-    else:
-        # Brightness is only a conservative fallback for a single likely event.
-        # It avoids the obvious night-to-day reversal but is not asserted as a true clock.
-        candidates.sort(key=lambda c: c["brightness"])
+    selected_pool = sorted(candidates, key=lambda c: c["visual_score"], reverse=True)
     chosen: list[dict[str, Any]] = []
     elapsed = 0.0
-    for candidate in candidates:
+    for candidate in selected_pool:
         if elapsed >= target_seconds:
             break
         remaining = target_seconds - elapsed
@@ -191,6 +183,15 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         candidate["end"] = candidate["start"] + candidate["clip_duration"]
         chosen.append(candidate)
         elapsed += candidate["clip_duration"]
+
+    # Trust embedded capture times only when most selected clips have them.
+    if chosen and len([c for c in chosen if c.get("creation_time")]) >= max(2, int(len(chosen) * 0.6)):
+        chosen.sort(key=lambda c: c.get("creation_time") or "9999")
+        chronology_mode = "capture-timestamps"
+    else:
+        # Brightness is a low-confidence fallback. It prevents an obvious night-to-day
+        # reversal in a likely single event, but cannot distinguish different events.
+        chosen.sort(key=lambda c: c["brightness"])
     if not chosen:
         chosen = [candidates[0]]
     audit = {
@@ -258,7 +259,7 @@ async def process_project(project_id: str) -> None:
 
 
 class ProjectCreate(BaseModel):
-    filenames: list[str] = Field(min_length=1, max_length=150)
+    filenames: list[str] = Field(min_length=1, max_length=1000)
 
 
 class FileComplete(BaseModel):
@@ -268,7 +269,7 @@ class FileComplete(BaseModel):
 
 
 class CompleteProject(BaseModel):
-    files: list[FileComplete] = Field(min_length=1, max_length=150)
+    files: list[FileComplete] = Field(min_length=1, max_length=1000)
 
 
 @app.get("/health")
