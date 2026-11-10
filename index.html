@@ -72,12 +72,12 @@ button,input,textarea{font:inherit}button{cursor:pointer}.shell{max-width:1440px
 <script>
 const input=document.getElementById('files'),drop=document.getElementById('drop'),grid=document.getElementById('clipGrid'),count=document.getElementById('clipCount'),status=document.getElementById('status');
 const batchCount=document.getElementById('batchCount'),batchSize=document.getElementById('batchSize'),progressWrap=document.getElementById('progressWrap'),progressBar=document.getElementById('progressBar');
-let clips=[],metadataQueue=[],metadataActive=0,metadataDone=0,metadataTotal=0;
+let clips=[],metadataQueue=[],metadataActive=0;
 const MAX_METADATA_JOBS=3;
 function fmt(n){return n<60?Math.round(n)+' sec':Math.floor(n/60)+':'+String(Math.round(n%60)).padStart(2,'0')}
 function bytes(n){return n>=1024? (n/1024).toFixed(2)+' Go':(n).toFixed(0)+' Mo'}
 function isVideo(file){return file.type.startsWith('video/')||/\.(mov|mp4|m4v|avi|mkv|webm)$/i.test(file.name)}
-function updateSummary(){
+function updateProgress(){\n const pending=clips.filter(c=>c.duration===null).length;const done=clips.length-pending;progressBar.style.width=(clips.length?done/clips.length*100:100)+'%';\n}\nfunction updateSummary(){
  count.textContent=clips.length+' clip'+(clips.length>1?'s':'');
  const total=clips.reduce((s,c)=>s+c.file.size,0);
  batchCount.textContent=clips.length?clips.length+' vidéo(s) sélectionnée(s)':'Aucun lot importé';
@@ -91,14 +91,14 @@ function render(){
   const v=document.createElement('video');v.src=c.url;v.muted=true;v.playsInline=true;v.preload='none';v.controls=true;v.setAttribute('aria-label','Aperçu de '+c.file.name);
   const info=document.createElement('div');info.className='clipinfo';
   const name=document.createElement('div');name.className='clipname';name.textContent=c.file.name;
-  const meta=document.createElement('div');meta.className='clipmeta';meta.textContent=(c.duration?fmt(c.duration):'Durée en analyse')+' · '+bytes(c.file.size/1048576);
+  const meta=document.createElement('div');meta.className='clipmeta';meta.textContent=(c.duration===null?'Durée en analyse':c.duration>0?fmt(c.duration):'Durée indisponible')+' · '+bytes(c.file.size/1048576);
   const del=document.createElement('button');del.className='remove';del.textContent='Retirer';del.onclick=()=>removeClip(c.id);
   info.append(name,meta,del);card.append(v,info);grid.append(card);
  });
 }
 function removeClip(id){
  const index=clips.findIndex(c=>c.id===id);if(index<0)return;
- URL.revokeObjectURL(clips[index].url);clips.splice(index,1);render();
+ URL.revokeObjectURL(clips[index].url);clips.splice(index,1);metadataQueue=metadataQueue.filter(c=>c.id!==id);updateProgress();render();
 }
 function processMetadata(){
  while(metadataActive<MAX_METADATA_JOBS&&metadataQueue.length){
@@ -134,7 +134,7 @@ input.onchange=e=>{addFiles(e.target.files);input.value=''};
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
 drop.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
 document.getElementById('clear').onclick=()=>{
- clips.forEach(c=>URL.revokeObjectURL(c.url));clips=[];metadataQueue=[];metadataTotal=0;metadataDone=0;render();progressWrap.hidden=true;status.textContent='Toutes les vidéos locales ont été retirées et leurs URL temporaires libérées.';
+ clips.forEach(c=>URL.revokeObjectURL(c.url));clips=[];metadataQueue=[];updateProgress();render();progressWrap.hidden=true;status.textContent='Toutes les vidéos locales ont été retirées et leurs URL temporaires libérées.';
 };
 window.addEventListener('beforeunload',()=>clips.forEach(c=>URL.revokeObjectURL(c.url)));
 </script>
