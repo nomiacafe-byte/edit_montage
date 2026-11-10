@@ -9,6 +9,7 @@
   const preview = $("renderPreview");
   const download = $("downloadFinal");
   const audit = $("chronologyAudit");
+  const shotAudit = $("shotAudit");
   let activeProject = null;
   let previewUrl = null;
   let busy = false;
@@ -65,7 +66,7 @@
       const job = await response.json();
       const phaseProgress = Math.max(55, Math.min(95, Number(job.progress || 55)));
       setProgress(phaseProgress, job.message || "Montage en cours…");
-      if (job.audit) {
+      if (Array.isArray(job.selected) && job.selected.length) {\n        shotAudit.textContent = "Passages retenus (ordre de montage) :\\n" + job.selected.map((shot, index) => (index + 1) + ". " + shot.name + " · " + Number(shot.start).toFixed(1) + "–" + Number(shot.end).toFixed(1) + " s · score visuel " + Math.round(Number(shot.visual_score || 0) * 100) + "/100").join("\\n");\n      }\n      if (job.audit) {
         const mode = job.audit.mode === "capture-timestamps" ? "Horodatages des fichiers" : "Estimation visuelle de la lumière";
         audit.textContent = "Chronologie : " + mode + " · confiance " + job.audit.chronology_confidence + ". " + job.audit.note;
       }
@@ -99,6 +100,7 @@
     download.hidden = true;
     preview.hidden = true;
     audit.textContent = "";
+    shotAudit.textContent = "";
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     try {
       const totalBytes = clips.reduce((sum, clip) => sum + clip.file.size, 0);
