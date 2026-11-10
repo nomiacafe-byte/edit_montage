@@ -27,6 +27,12 @@
   const request = async (url, options = {}) => {
     const response = await fetch(apiBase + url, { ...options, headers: headers(options.headers || {}) });
     if (!response.ok) {
+      if (response.status === 401) {
+        token = "";
+        sessionStorage.removeItem("rafa-studio-session");
+        if (accessPanel) accessPanel.hidden = false;
+        if (accessMessage) accessMessage.textContent = "Ta session a expiré. Déverrouille à nouveau le studio.";
+      }
       let detail = response.status + " " + response.statusText;
       try { const body = await response.json(); detail = body.detail || body.error || detail; } catch (_) {}
       throw new Error(detail);
