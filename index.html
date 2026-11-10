@@ -248,6 +248,15 @@ document.getElementById('clear').onclick=()=>{
  progressWrap.hidden=true;
  status.textContent='Toutes les vidéos locales ont été retirées et leurs URL temporaires libérées.';
 };
+window.addEventListener('rafa-export-complete',()=>{
+ clips.forEach(clip=>URL.revokeObjectURL(clip.url));
+ clips=[];
+ metadataQueue=[];
+ updateProgress();
+ render();
+ progressWrap.hidden=true;
+ status.textContent='MP4 téléchargé. Les rushes ont été retirés de la session locale.';
+});
 window.addEventListener('beforeunload',()=>{
  clips.forEach(clip=>URL.revokeObjectURL(clip.url));
 });
