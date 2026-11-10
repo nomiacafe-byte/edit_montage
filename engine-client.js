@@ -71,7 +71,7 @@
         shotAudit.textContent = "Passages retenus (ordre de montage) :\\n" + job.selected.map((shot, index) => (index + 1) + ". " + shot.name + " · " + Number(shot.start).toFixed(1) + "–" + Number(shot.end).toFixed(1) + " s · score visuel " + Math.round(Number(shot.visual_score || 0) * 100) + "/100").join("\\n");
       }
       if (job.audit) {
-        const mode = job.audit.mode === "capture-timestamps" ? "Horodatages des fichiers" : "Estimation visuelle de la lumière";
+        const mode = job.audit.mode === "capture-timestamps" ? "Horodatages des fichiers" : job.audit.mode === "single-recording-timecodes" ? "Chronologie interne de l’enregistrement" : "Estimation visuelle de la lumière";
         const vision = job.audit.semantic_analysis === "vision-enabled" ? "Analyse visuelle IA activée" : "Analyse visuelle locale";
         const categories = Array.isArray(job.audit.shot_categories) ? " · Plans : " + job.audit.shot_categories.join(", ") : "";
         audit.textContent = vision + " · Chronologie : " + mode + " · confiance " + job.audit.chronology_confidence + categories + ". " + job.audit.note;
