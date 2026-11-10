@@ -43,7 +43,7 @@ try:
     headers = {"X-Rafa-Token": login.json()["token"]}
 
     run("ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x480:rate=25",
-        "-t", "7", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(sample))
+        "-t", "35", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(sample))
 
     created = requests.post(BASE + "/api/projects", json={"filenames": [sample.name]}, headers=headers, timeout=20)
     created.raise_for_status()
@@ -78,17 +78,22 @@ try:
     preview = requests.get(f"{BASE}/api/projects/{project_id}/preview", headers=headers, timeout=60)
     preview.raise_for_status()
     assert len(preview.content) > 1000 and preview.content[4:8] == b"ftyp"
+    duration = subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(sample)], text=True).strip()
+    assert float(duration) >= 35.0
 
     final = requests.get(f"{BASE}/api/projects/{project_id}/download", headers=headers, timeout=60)
     final.raise_for_status()
     assert len(final.content) > 1000 and final.content[4:8] == b"ftyp"
+    (ROOT / "rafa-final-smoke.mp4").write_bytes(final.content)
+    rendered_duration = subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(ROOT / "rafa-final-smoke.mp4")], text=True).strip()
+    assert 20.0 <= float(rendered_duration) <= 30.0, "Expected a 20–30 second Reel, got " + rendered_duration
 
     ack = requests.post(f"{BASE}/api/projects/{project_id}/ack-download", headers=headers, timeout=20)
     ack.raise_for_status()
     deleted = requests.get(f"{BASE}/api/projects/{project_id}", headers=headers, timeout=20)
     assert deleted.status_code == 404
 
-    print("Smoke test passed: upload -> analyze -> FFmpeg MP4 -> preview -> download -> cleanup")
+    print("Smoke test passed: 35-second source -> 20–30 second Reel -> preview -> download -> cleanup")
 finally:
     server.terminate()
     try:
@@ -96,3 +101,4 @@ finally:
     except subprocess.TimeoutExpired:
         server.kill()
     sample.unlink(missing_ok=True)
+    (ROOT / "rafa-final-smoke.mp4").unlink(missing_ok=True)
