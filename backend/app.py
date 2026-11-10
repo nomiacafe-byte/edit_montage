@@ -420,16 +420,32 @@ def delete_project(project_id: str, x_rafa_token: str | None = Header(default=No
     return {"ok": True, "deleted": True}
 
 
-@app.on_event("startup")
-def purge_expired_projects():
+def purge_expired_once() -> None:
     now = time.time()
     for folder in ROOT.iterdir():
         if not folder.is_dir():
             continue
         try:
             state_file = folder / "job.json"
-            created = json.loads(state_file.read_text()).get("created_at", folder.stat().st_mtime) if state_file.exists() else folder.stat().st_mtime
+            state = jobs.get(folder.name)
+            created = state.get("created_at") if state else None
+            if created is None:
+                created = json.loads(state_file.read_text()).get("created_at", folder.stat().st_mtime) if state_file.exists() else folder.stat().st_mtime
             if now - float(created) > PROJECT_TTL:
                 shutil.rmtree(folder, ignore_errors=True)
+                jobs.pop(folder.name, None)
+                project_locks.pop(folder.name, None)
         except Exception:
             continue
+
+
+async def expiry_sweeper() -> None:
+    while True:
+        await asyncio.to_thread(purge_expired_once)
+        await asyncio.sleep(900)
+
+
+@app.on_event("startup")
+async def start_expiry_sweeper():
+    await asyncio.to_thread(purge_expired_once)
+    asyncio.create_task(expiry_sweeper())
