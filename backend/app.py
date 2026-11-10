@@ -168,7 +168,7 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         for sample in peaks:
             if all(abs(sample["time"] - prev["time"]) >= 4.5 for prev in chosen_peaks):
                 chosen_peaks.append(sample)
-            if len(chosen_peaks) >= 4:
+            if len(chosen_peaks) >= 8:
                 break
 
         clip_len = min(4.0, max(2.2, target_seconds / 7.0))
@@ -189,14 +189,14 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
     if not candidates:
         raise RuntimeError("Aucun passage vidéo exploitable n'a été détecté.")
 
-    # Rank by visual quality, but limit each source to two shots for variety.
+    # Rank by visual quality, but cap each source at seven shots so one long recording can fill a 20–30 s Reel without letting a single angle dominate.
     selected_pool = sorted(candidates, key=lambda c: c["visual_score"], reverse=True)
     chosen: list[dict[str, Any]] = []
     source_counts: dict[int, int] = {}
     elapsed = 0.0
     for candidate in selected_pool:
         source_id = int(candidate["source_index"])
-        if source_counts.get(source_id, 0) >= 2:
+        if source_counts.get(source_id, 0) >= 7:
             continue
         if elapsed >= target_seconds:
             break
@@ -229,7 +229,7 @@ def choose_moments(files: list[dict[str, Any]], target_seconds: float = 26.0) ->
         "source_count": len({c["source_index"] for c in chosen}),
         "estimated_seconds": round(sum(c["clip_duration"] for c in chosen), 2),
         "chronology_confidence": "medium" if chronology_mode == "capture-timestamps" else "low",
-        "note": "Plusieurs moments distincts sont évalués par vidéo, avec au plus deux extraits par source. L'ordre par luminosité est une estimation, pas une preuve de chronologie; les événements distincts devront être regroupés par analyse sémantique.",
+        "note": "Plusieurs moments distincts sont évalués par vidéo, avec au plus sept extraits par source pour gérer aussi un seul long enregistrement. L'ordre par luminosité est une estimation, pas une preuve de chronologie; les événements distincts devront être regroupés par analyse sémantique.",
     }
     return chosen, audit
 
