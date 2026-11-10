@@ -85,6 +85,13 @@
         const vision = job.audit.semantic_analysis === "vision-enabled" ? "Analyse visuelle IA activée" : "Analyse visuelle locale";
         const categories = Array.isArray(job.audit.shot_categories) ? " · Plans : " + job.audit.shot_categories.join(", ") : "";
         audit.textContent = vision + " · Chronologie : " + mode + " · confiance " + job.audit.chronology_confidence + categories + ". " + job.audit.note;
+        if (Array.isArray(job.selected)) {
+          shotAudit.textContent = "Extraits retenus : " + job.selected.map((shot, index) =>
+            (index + 1) + ". " + (shot.semantic_category || "moment fort") +
+            (shot.semantic_action ? " — " + shot.semantic_action : "") +
+            " · " + Number(shot.moment_time || 0).toFixed(1) + " s"
+          ).join("  /  ");
+        }
       }
       if (job.status === "preview_ready") return job;
       if (job.status === "error") throw new Error(job.error || job.message || "Le rendu a échoué.");
