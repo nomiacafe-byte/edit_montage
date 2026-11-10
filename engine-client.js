@@ -250,9 +250,9 @@
     audit.textContent = ""; shotAudit.textContent = "";
     if (outputUrl) URL.revokeObjectURL(outputUrl);
     outputBlob = null; outputUrl = null;
+    let audioContext = null;
     try {
       setProgress(1, "Préparation de l'analyse locale sur ton iPhone…");
-      let audioContext = null;
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         try { audioContext = new AudioCtx(); await audioContext.resume(); } catch (_) { audioContext = null; }
@@ -274,6 +274,7 @@
       download.hidden = false;
       setProgress(100, "Aperçu prêt · regarde ton Reel avant de le télécharger.");
     } catch (error) {
+      if (audioContext) await audioContext.close().catch(() => {});
       setProgress(0, "Le montage n'a pas abouti : " + (error && error.message ? error.message : "erreur inconnue"));
     } finally {
       busy = false;
